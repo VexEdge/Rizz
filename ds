@@ -1,0 +1,735 @@
+
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/VexEdge/Rizz/refs/heads/patch-2/Geckoo.Lib.Fr"))()
+
+
+local hint = Instance.new("Hint", game.CoreGui)
+hint.Text = "VexEdge.inf | V1.3"
+local fullText = ""
+local typingSpeed = 0.1
+
+-- Typing effect
+for i = 1, #fullText do
+    hint.Text = string.sub(fullText, 1, i)
+    wait(typingSpeed)
+end
+
+-- Wait for 5 seconds before disappearing
+wait(5)
+
+-- Remove the hint
+hint:Destroy()
+
+
+
+local PepsisWorld = library:CreateWindow({
+    Name = "Geckoo ",
+    Credit= "False"
+})
+
+
+
+local GeneralTab = PepsisWorld:CreateTab({
+    Name = "Client"
+})
+
+local ClientSided = GeneralTab:CreateSection({
+    Name = "Chams & ESP",
+})
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LOCAL_PLAYER = Players.LocalPlayer
+
+local MAX_DISTANCE = 600 * 3.28 -- 600 meters converted to studs
+
+-- Variables to track toggle states
+local espEnabled = false
+local chamsEnabled = false
+local fillColor = Color3.fromRGB(194, 218, 184) -- Default fill color for Chams
+
+-- Table to track players with ESP
+local trackedPlayers = {}
+
+-- Function to create ESP for a player
+local function createESP(player)
+    if not espEnabled or trackedPlayers[player] then return end
+
+    local espElements = {
+        espBox = Drawing.new("Square"),
+        nameLabel = Drawing.new("Text"),
+        distanceLabel = Drawing.new("Text"),
+        healthBarBackground = Drawing.new("Square"),
+        healthBar = Drawing.new("Square"),
+    }
+
+    -- ESP Box Settings
+    espElements.espBox.Thickness = 2
+    espElements.espBox.Color = Color3.new(1, 0, 0) -- Red box
+    espElements.espBox.Filled = false
+    espElements.espBox.Visible = false
+
+    -- Name Label Settings
+    espElements.nameLabel.Size = 16
+    espElements.nameLabel.Center = true
+    espElements.nameLabel.Outline = true
+    espElements.nameLabel.Color = Color3.new(1, 1, 1) -- White text
+    espElements.nameLabel.Visible = false
+
+    -- Distance Label Settings
+    espElements.distanceLabel.Size = 14
+    espElements.distanceLabel.Center = true
+    espElements.distanceLabel.Outline = true
+    espElements.distanceLabel.Color = Color3.new(1, 1, 1) -- White text
+    espElements.distanceLabel.Visible = false
+
+    -- Health Bar Background Settings
+    espElements.healthBarBackground.Size = Vector2.new(50, 5)
+    espElements.healthBarBackground.Color = Color3.new(0, 0, 0) -- Black background
+    espElements.healthBarBackground.Filled = true
+    espElements.healthBarBackground.Visible = false
+
+    -- Health Bar Settings
+    espElements.healthBar.Size = Vector2.new(50, 5)
+    espElements.healthBar.Color = Color3.new(0, 1, 0) -- Green for health
+    espElements.healthBar.Filled = true
+    espElements.healthBar.Visible = false
+
+    -- Function to update ESP elements
+    local function updateESP()
+        if not espEnabled or not player.Character then
+            -- Hide all ESP elements
+            for _, element in pairs(espElements) do
+                element.Visible = false
+            end
+            return
+        end
+
+        local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+        local humanoid = player.Character:FindFirstChild("Humanoid")
+        if rootPart and humanoid and humanoid.Health > 0 then
+            local rootScreenPos, rootOnScreen = Camera:WorldToViewportPoint(rootPart.Position)
+            local distanceStuds = (LOCAL_PLAYER.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude
+            local distanceMeters = distanceStuds / 3.28
+
+            if rootOnScreen and distanceStuds <= MAX_DISTANCE then
+                -- Update small ESP box
+                local boxSize = Vector2.new(5, 5)
+                espElements.espBox.Position = Vector2.new(rootScreenPos.X - boxSize.X / 2, rootScreenPos.Y - boxSize.Y / 2)
+                espElements.espBox.Size = boxSize
+                espElements.espBox.Visible = true
+
+                -- Update name label
+                espElements.nameLabel.Position = Vector2.new(rootScreenPos.X, rootScreenPos.Y - 20)
+                espElements.nameLabel.Text = player.Name
+                espElements.nameLabel.Visible = true
+
+                -- Update distance label
+                espElements.distanceLabel.Position = Vector2.new(rootScreenPos.X, rootScreenPos.Y + 10)
+                espElements.distanceLabel.Text = string.format("%.1f meters", distanceMeters)
+                espElements.distanceLabel.Visible = true
+
+                -- Update health bar
+                local healthPercent = humanoid.Health / humanoid.MaxHealth
+                espElements.healthBarBackground.Position = Vector2.new(rootScreenPos.X - 25, rootScreenPos.Y + 20)
+                espElements.healthBar.Position = espElements.healthBarBackground.Position
+                espElements.healthBar.Size = Vector2.new(50 * healthPercent, 5)
+
+                espElements.healthBarBackground.Visible = true
+                espElements.healthBar.Visible = true
+            else
+                -- Hide elements if out of range
+                for _, element in pairs(espElements) do
+                    element.Visible = false
+                end
+            end
+        end
+    end
+
+    -- Monitor player updates
+    trackedPlayers[player] = espElements
+    RunService.RenderStepped:Connect(updateESP)
+end
+
+-- Toggle ESP
+ClientSided:AddToggle({
+    Name = "Toggle ESP",
+    Flag = "ESP_Toggle",
+    Keybind = 1,
+    Callback = function(state)
+        espEnabled = state
+        if not espEnabled then
+            -- Remove all ESP elements
+            for _, espData in pairs(trackedPlayers) do
+                for _, element in pairs(espData) do
+                    element:Remove()
+                end
+            end
+            trackedPlayers = {} -- Clear the table
+        else
+            -- Enable ESP for all players
+            for _, player in ipairs(Players:GetPlayers()) do
+                createESP(player)
+            end
+        end
+    end
+})
+
+-- Function to apply Chams
+local function ApplyHighlight(Player)
+    if not chamsEnabled then return end
+
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    local Highlighter = Instance.new("Highlight", Character)
+    Highlighter.FillColor = fillColor
+
+    local function Disconnect()
+        if Highlighter then Highlighter:Destroy() end
+    end
+
+    Player.CharacterRemoving:Connect(Disconnect)
+end
+
+-- Toggle Chams
+ClientSided:AddToggle({
+    Name = "Toggle Chams",
+    Flag = "Chams_Toggle",
+    Keybind = 2,
+    Callback = function(state)
+        chamsEnabled = state
+        for _, player in ipairs(Players:GetPlayers()) do
+            if chamsEnabled then
+                ApplyHighlight(player)
+            else
+                if player.Character then
+                    for _, highlight in pairs(player.Character:GetChildren()) do
+                        if highlight:IsA("Highlight") then
+                            highlight:Destroy()
+                        end
+                    end
+                end
+            end
+        end
+    end
+})
+
+-- Set Chams Color
+ClientSided:AddColorpicker({
+    Name = "Chams Fill Color",
+    Value = fillColor,
+    Flag = "Chams_Fill_Color",
+    Callback = function(newColor)
+        fillColor = newColor
+        for _, player in ipairs(Players:GetPlayers()) do
+            ApplyHighlight(player)
+        end
+    end
+})
+
+-- Initialize ESP & Chams
+for _, player in ipairs(Players:GetPlayers()) do
+    if espEnabled then createESP(player) end
+    if chamsEnabled then ApplyHighlight(player) end
+end
+
+
+local ClientSided = GeneralTab:CreateSection({
+    Name = "Guns",
+    Side = "Right"
+})
+
+local UserInputService = game:GetService("UserInputService")
+local player = game.Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local zoomEnabled = false  -- This will track whether zoom is enabled via toggle
+local zoomedIn = false    -- To track whether we are currently zoomed in or not
+local zoomFOV = 30        -- The field of view for zoomed-in state
+local defaultFOV = 70     -- Default field of view
+local originalFOV = defaultFOV -- Variable to store the original FOV before zooming
+
+-- Function to set the Default FOV for the player in ReplicatedStorage
+local function updateFOV(value)
+    local playerFolder = game.ReplicatedStorage.Players:FindFirstChild(player.Name)
+
+    if playerFolder then
+        local settings = playerFolder:FindFirstChild("Settings")
+        local gameplaySettings = settings and settings:FindFirstChild("GameplaySettings")
+
+        if gameplaySettings then
+            if gameplaySettings:GetAttribute("DefaultFOV") ~= nil then
+                gameplaySettings:SetAttribute("DefaultFOV", tostring(value)) -- Store as a string
+                print("Default FOV set to: " .. tostring(value))
+            else
+                warn("Attribute 'DefaultFOV' does not exist in GameplaySettings for player " .. player.Name)
+            end
+        else
+            warn("GameplaySettings folder not found inside Settings for player " .. player.Name)
+        end
+    else
+        warn("Player folder not found in ReplicatedStorage for player " .. player.Name)
+    end
+end
+
+-- Toggle for "Trick Spammer"
+ClientSided:AddToggle({
+    Name = "Zoom in. fr",
+    Flag = "FarmingSection_TrickSpammer",
+    Keybind = 1,
+    Callback = function(value)
+        zoomEnabled = value  -- Update zoomEnabled state based on toggle
+        if not zoomEnabled and zoomedIn then
+            camera.FieldOfView = originalFOV  -- Reset to original FOV if zoom is disabled
+            zoomedIn = false
+        end
+    end
+})
+
+-- Listen for MB2 (middle mouse button) input to zoom in when the toggle is enabled
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end  -- Ignore if the game has already processed this input
+
+    if zoomEnabled and input.UserInputType == Enum.UserInputType.MouseButton2 then
+        -- If middle mouse button is held and zoom is enabled, store the original FOV and zoom in
+        originalFOV = camera.FieldOfView  -- Store the current FOV before zooming
+        camera.FieldOfView = zoomFOV
+        zoomedIn = true
+    end
+end)
+
+-- Listen for when MB2 is released to revert zoom
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        -- Revert zoom when MB2 is released, but only if zoom is enabled
+        if zoomEnabled and zoomedIn then
+            camera.FieldOfView = originalFOV  -- Restore the original FOV
+            zoomedIn = false
+        end
+    end
+end)
+
+-- Add a slider for changing the FOV
+ClientSided:AddSlider({
+    Name = "Zoom in value",
+    Flag = "FarmingSection_FOVSlider",
+    Value = defaultFOV,  -- Default FOV value
+    Min = 20,            -- Minimum FOV
+    Max = 120,           -- Maximum FOV
+    Precise = 2,         -- Precision for the slider
+    Callback = function(value)
+        -- Update the camera's FOV immediately when the slider value changes
+        camera.FieldOfView = value
+        -- Update the player's FOV setting in ReplicatedStorage
+        updateFOV(value)
+        -- If zoom is enabled and zoomed in, adjust the originalFOV accordingly
+        if zoomEnabled and zoomedIn then
+            originalFOV = value  -- Adjust original FOV to match the new slider value when zoom is active
+        end
+    end
+})
+
+
+
+
+
+
+local Sigma = PepsisWorld:CreateTab({
+    Name = "Aimbot" 
+})
+
+local EdgingAimbot = Sigma:CreateSection({
+    Name = "Aimbot",
+})
+
+-- // Services
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Camera = game:GetService("Workspace").CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- // Default Values
+local Aim_Enabled = false
+local Prediction_Enabled = false
+local Aim_Smoothness = 0.15
+local FOV_RADIUS = 150
+local HoldingMB2 = false
+local LockThroughWalls = false
+
+-- // FOV Circle
+local FOV_Circle = Drawing.new("Circle")
+FOV_Circle.Thickness = 2
+FOV_Circle.Filled = false
+FOV_Circle.Transparency = 1
+FOV_Circle.Color = Color3.fromRGB(255, 0, 0) -- Default color
+FOV_Circle.Visible = false -- Initially hidden
+
+-- // Function to update FOV position
+local function UpdateFOV()
+    local MouseLocation = UserInputService:GetMouseLocation()
+    FOV_Circle.Position = MouseLocation
+    FOV_Circle.Radius = FOV_RADIUS
+    FOV_Circle.Visible = Aim_Enabled -- Only show FOV when Aim Assist is on
+end
+
+-- // Function to get closest player inside the FOV
+local function GetClosestPlayer()
+    local ClosestPlayer = nil
+    local ShortestDistance = FOV_RADIUS
+
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+            local RootPart = Player.Character.HumanoidRootPart
+            local Humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
+            local Velocity = RootPart.Velocity
+
+            local ScreenPos, OnScreen = Camera:WorldToViewportPoint(RootPart.Position)
+
+            if OnScreen then
+                local MousePos = UserInputService:GetMouseLocation()
+                local Distance = (Vector2.new(ScreenPos.X, ScreenPos.Y) - MousePos).Magnitude
+
+                if Distance < ShortestDistance and (not LockThroughWalls or not Camera:GetPartsObscuringTarget({RootPart.Position}, {RootPart.Parent})) then
+                    ShortestDistance = Distance
+                    ClosestPlayer = RootPart
+                end
+            end
+        end
+    end
+
+    return ClosestPlayer
+end
+
+-- // Smart Prediction Function
+local function GetPredictedPosition(Target)
+    if not Target or not Prediction_Enabled then return Target.Position end
+
+    local Velocity = Target.Velocity
+    local Distance = (Target.Position - Camera.CFrame.Position).Magnitude
+
+    -- Smart prediction: scales prediction time based on target speed & distance
+    local PredictionFactor = math.clamp(Distance / 100, 0.05, 0.2)
+    return Target.Position + (Velocity * PredictionFactor)
+end
+
+-- // Mouse Button Detection
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        HoldingMB2 = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        HoldingMB2 = false
+    end
+end)
+
+-- // Main loop to update aim
+RunService.RenderStepped:Connect(function()
+    UpdateFOV()
+
+    if Aim_Enabled and HoldingMB2 then
+        local Target = GetClosestPlayer()
+        if Target then
+            local AimPosition = GetPredictedPosition(Target)
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, AimPosition), Aim_Smoothness)
+        end
+    end
+end)
+
+-- // UI Callbacks
+EdgingAimbot:AddToggle({
+    Name = "Toggle",
+    Flag = "FarmingSection_CollectCoins",
+    Callback = function(Value)
+        Aim_Enabled = Value
+        FOV_Circle.Visible = Value -- Ensure visibility updates correctly
+    end
+})
+
+EdgingAimbot:AddToggle({
+    Name = "Prediction Aiming",
+    Flag = "FarmingSection_PredictionAiming",
+    Callback = function(Value)
+        Prediction_Enabled = Value
+    end
+})
+
+EdgingAimbot:AddToggle({
+    Name = "Lock Through Walls",
+    Flag = "FarmingSection_LockThroughWalls",
+    Callback = function(Value)
+        LockThroughWalls = Value
+    end
+})
+
+EdgingAimbot:AddSlider({
+    Name = "Strength",
+    Flag = "FarmingSection_TrickRate",
+    Value = 0.15,
+    Precise = 2,
+    Min = 0,
+    Max = 1,
+    Callback = function(Value)
+        Aim_Smoothness = Value
+    end
+})
+
+EdgingAimbot:AddSlider({
+    Name = "FOV Size",
+    Flag = "FarmingSection_FOVSize",
+    Value = 150,
+    Precise = 0,
+    Min = 50,
+    Max = 300,
+    Callback = function(Value)
+        FOV_RADIUS = Value
+    end
+})
+
+
+local EdgingAimbot = Sigma:CreateSection({
+    Name = "Look",
+    Side = "Right"
+})
+
+EdgingAimbot:AddColorPicker({
+    Name = "FOV Color",
+    Flag = "FOVColor_Flag",
+    Callback = function(Value)
+        FOV_Circle.Color = Value
+        print("")
+    end
+})
+
+EdgingAimbot:AddSlider({
+    Name = "Transparency",
+    Flag = "Deaddassss_FOVTransparency",
+    Value = 1,
+    Precise = 2,
+    Min = 0,
+    Max = 1,
+    Callback = function(Value)
+        FOV_Circle.Transparency = Value
+    end
+})
+
+
+
+
+
+
+local GeneralTab = PepsisWorld:CreateTab({
+    Name = "Random"
+})
+
+local ClientSettings = GeneralTab:CreateSection({
+    Name = "Client Settings"
+})
+
+ClientSettings:AddSlider({
+    Name = "Fov",
+    Min = 20,
+    Max = 140,
+    Default = 120,
+    Callback = function(value)
+        local player = game.Players.LocalPlayer -- Get the local player
+        local playerFolder = game.ReplicatedStorage.Players:FindFirstChild(player.Name)
+
+        if playerFolder then
+            local settings = playerFolder:FindFirstChild("Settings")
+            local gameplaySettings = settings and settings:FindFirstChild("GameplaySettings")
+
+            if gameplaySettings then
+                if gameplaySettings:GetAttribute("DefaultFOV") ~= nil then
+                    gameplaySettings:SetAttribute("DefaultFOV", tostring(value)) -- Store as a string
+                    print("Default FOV set to: " .. tostring(value))
+                else
+                    warn("Attribute 'DefaultFOV' does not exist in GameplaySettings for player " .. player.Name)
+                end
+            else
+                warn("GameplaySettings folder not found inside Settings for player " .. player.Name)
+            end
+        else
+            warn("Player folder not found in ReplicatedStorage for player " .. player.Name)
+        end
+    end
+})
+
+
+ClientSettings:AddToggle({
+    Name = "SpinBot",
+    Default = false,
+    Callback = function(enabled)
+        local player = game.Players.LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        local lowerTorso = character and character:FindFirstChild("LowerTorso")
+        local rootJoint = lowerTorso and lowerTorso:FindFirstChild("Root") -- RootJoint connects torso to HumanoidRootPart
+        local camera = game.Workspace.CurrentCamera
+
+        if rootPart then
+            _G.Rotating = enabled
+            if enabled then
+                task.spawn(function()
+                    while _G.Rotating do
+                        task.wait(0.03)
+                        
+                        if player.CameraMode == Enum.CameraMode.LockFirstPerson then
+                            -- Rotate rootPart directly in first-person mode without affecting the camera
+                            rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(_G.RotationSpeed or 10), 0)
+                        elseif rootJoint then
+                            -- Rotate normally in third-person mode
+                            rootJoint.C0 = rootJoint.C0 * CFrame.Angles(0, math.rad(_G.RotationSpeed or 10), 0)
+                        end
+                    end
+                end)
+            end
+        else
+            warn("RootPart or RootJoint not found for player " .. player.Name)
+        end
+    end
+})
+
+ClientSettings:AddSlider({
+    Name = "Spin Bot Speed",
+    Min = 1,
+    Max = 100,
+    Default = 10,
+    Callback = function(value)
+        _G.RotationSpeed = value
+    end
+})
+
+
+
+
+local ClientSided = GeneralTab:CreateSection({
+    Name = "Gui",
+    Side = "Right"
+})
+
+ClientSided:AddButton({
+    Name = "No effects",
+    Callback = function()
+        -- Remove specific blur and effects from Lighting
+        local lighting = game:GetService("Lighting")
+        
+        -- Remove BlurEffects
+        local waterBlur = lighting:FindFirstChild("WaterBlur")
+        if waterBlur and waterBlur:IsA("BlurEffect") then
+            waterBlur:Destroy()
+            print("WaterBlur removed")
+        end
+
+        local inventoryBlur = lighting:FindFirstChild("InventoryBlur")
+        if inventoryBlur and inventoryBlur:IsA("BlurEffect") then
+            inventoryBlur:Destroy()
+            print("InventoryBlur removed")
+        end
+
+        -- Remove HurtEffect (ColorCorrectionEffect)
+        local hurtEffect = lighting:FindFirstChild("HurtEffect")
+        if hurtEffect and hurtEffect:IsA("ColorCorrectionEffect") then
+            hurtEffect:Destroy()
+            print("HurtEffect removed")
+        end
+    end
+})
+
+ClientSided:AddButton({
+    Name = "FullBright",
+    Callback = function()
+        local lighting = game:GetService("Lighting")
+
+        -- Remove Skybox
+        lighting.Sky = nil
+        print("Skybox removed")
+
+        -- Remove Fog
+        lighting.FogEnd = math.huge
+        lighting.FogStart = 0
+        lighting.FogColor = Color3.new(1, 1, 1) -- White fog (effectively no fog)
+        print("Fog removed")
+
+        -- Make the game brighter by modifying Lighting properties
+        lighting.Ambient = Color3.new(1, 1, 1)  -- Bright white ambient light
+        lighting.Brightness = 2  -- Adjust brightness as needed
+        lighting.OutdoorAmbient = Color3.new(1, 1, 1)  -- Set outdoor ambient light
+        print("Fullbright enabled")
+    end
+})
+
+
+ClientSided:AddButton({
+    Name = "Rejoin",
+    Callback = function()
+        local player = game:GetService("Players").LocalPlayer
+
+        -- Store the current game ID (the player's current place)
+        local currentGameID = game.PlaceId
+        local currentJobID = game.JobId
+
+        -- Rejoin the same game
+        game:GetService("TeleportService"):TeleportToPlaceInstance(currentGameID, currentJobID, player)
+        
+        print("Rejoining the same game...")
+    end
+})
+
+local ClientSided = GeneralTab:CreateSection({
+    Name = "environment",
+    Side = "Right"
+})
+
+ClientSided:AddButton({
+    Name = "Green",
+    Callback = function()
+        Lighting.Ambient = Color3.fromRGB(0, 255, 0)
+    end
+})
+
+ClientSided:AddButton({
+    Name = "Yellow",
+    Callback = function()
+        Lighting.Ambient = Color3.fromRGB(255, 255, 0)
+    end
+})
+
+ClientSided:AddButton({
+    Name = "Blue",
+    Callback = function()
+        Lighting.Ambient = Color3.fromRGB(0, 0, 255)
+    end
+})
+
+ClientSided:AddButton({
+    Name = "Red",
+    Callback = function()
+        Lighting.Ambient = Color3.fromRGB(255, 0, 0)
+    end
+})
+
+ClientSided:AddButton({
+    Name = "Purple",
+    Callback = function()
+        Lighting.Ambient = Color3.fromRGB(128, 0, 128)
+    end
+})
+
+
+
+
+
+
+
+
+game.StarterGui:SetCore("SendNotification", {
+    Title = "Script loaded",
+    Text = "V|1.3",
+    Button1 = "yeah.",
+    Button2 = "really?!!?!?!?!?!?",
+    Duration = math.huge
+})
